@@ -1,28 +1,65 @@
 package main
 
 import (
+	"fmt"
 	"log"
+	"os"
 
-	"github.com/ganiramadhan/go-fiber-app/internal/handler"
-	"github.com/ganiramadhan/go-fiber-app/internal/repository"
-	"github.com/ganiramadhan/go-fiber-app/internal/service"
+	"go-journey/src/database"
+	"go-journey/src/database/migrations"
+	"go-journey/src/router"
+
 	"github.com/gofiber/fiber/v2"
+	"github.com/gofiber/fiber/v2/middleware/cors"
+	"github.com/gofiber/fiber/v2/middleware/logger"
+	"github.com/gofiber/fiber/v2/middleware/recover"
+
+	"github.com/gofiber/swagger"
+	"github.com/joho/godotenv"
+
+	_ "go-journey/src/docs"
 )
 
+// @title           User API
+// @version         1.0
+// @description     API service for managing users
+// @host            localhost:8080
+// @BasePath        /
 func main() {
+	// Load .env
+	if err := godotenv.Load(); err != nil {
+		log.Println("⚠️ No .env file found, using system env")
+	}
+
+	// Connect DB
+	database.ConnectDB()
+
+	// Run migrations
+	migrations.Migrate()
+
+	// Fiber app
 	app := fiber.New()
 
-	// === User ===
-	userRepo := repository.NewUserRepository()
-	userService := service.NewUserService(userRepo)
-	userHandler := handler.NewUserHandler(userService)
+	// Middleware
+	app.Use(logger.New())
+	app.Use(recover.New())
+	app.Use(cors.New())
 
-	app.Get("/users", userHandler.GetUsers)
-	app.Post("/users", userHandler.CreateUser)
+	// Routes
+	router.UserRoutes(app)
 
-	// Start server with log + error handling
-	log.Println("🚀 Server running at http://localhost:8080")
-	if err := app.Listen(":8080"); err != nil {
-		log.Fatal("❌ Failed to start server: ", err)
+	app.Get("/swagger/*", swagger.HandlerDefault)
+
+	// Get PORT from .env or default 8080
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	// Run server
+	addr := fmt.Sprintf(":%s", port)
+	log.Printf("🚀 Server running at http://localhost%s", addr)
+	if err := app.Listen(addr); err != nil {
+		log.Fatalf("❌ Failed to start server: %v", err)
 	}
 }
