@@ -10,6 +10,7 @@ import (
 	"go-journey/src/validation"
 
 	"github.com/gofiber/fiber/v2"
+	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
 
@@ -26,6 +27,12 @@ func GetUsers(c *fiber.Ctx) error {
 	if err != nil {
 		return utils.HandleServerError(c, err)
 	}
+
+	// Hapus password sebelum return
+	for i := range users {
+		users[i].Password = ""
+	}
+
 	return c.JSON(res.SuccessResponse("Users fetched successfully", users))
 }
 
@@ -44,18 +51,19 @@ func GetUser(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).
-			JSON(res.ErrorResponse("Invalid user ID", err.Error()))
+			JSON(res.ErrorResponse("Invalid user ID", err))
 	}
 
 	user, err := service.GetUserByID(uint(id))
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return c.Status(fiber.StatusNotFound).
-				JSON(res.ErrorResponse("User not found", err.Error()))
+				JSON(res.ErrorResponse("User not found", err))
 		}
 		return utils.HandleServerError(c, err)
 	}
 
+	user.Password = "" // hide password
 	return c.JSON(res.SuccessResponse("User fetched successfully", user))
 }
 
@@ -76,20 +84,27 @@ func CreateUser(c *fiber.Ctx) error {
 		return utils.HandleValidationError(c, err)
 	}
 
-	if err := validation.ValidateStruct(req); err != nil {
+	if err := validation.ValidateStruct(&req); err != nil {
 		return utils.HandleValidationError(c, err)
+	}
+
+	// hash password
+	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		return utils.HandleServerError(c, err)
 	}
 
 	user := model.User{
 		Name:     req.Name,
 		Email:    req.Email,
-		Password: req.Password,
+		Password: string(hashed),
 	}
 
 	if err := service.CreateUser(&user); err != nil {
 		return utils.HandleServerError(c, err)
 	}
 
+	user.Password = "" // hide password
 	return c.Status(fiber.StatusCreated).
 		JSON(res.SuccessResponse("User created successfully", user))
 }
@@ -104,13 +119,14 @@ func CreateUser(c *fiber.Ctx) error {
 // @Param        user  body      validation.UpdateUserRequest true "User data"
 // @Success      200 {object} res.Response{data=model.User}
 // @Failure      400 {object} res.Response
+// @Failure      404 {object} res.Response
 // @Failure      500 {object} res.Response
 // @Router       /users/{id} [put]
 func UpdateUser(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).
-			JSON(res.ErrorResponse("Invalid user ID", err.Error()))
+			JSON(res.ErrorResponse("Invalid user ID", err))
 	}
 
 	var req validation.UpdateUserRequest
@@ -118,21 +134,38 @@ func UpdateUser(c *fiber.Ctx) error {
 		return utils.HandleValidationError(c, err)
 	}
 
-	if err := validation.ValidateStruct(req); err != nil {
+	if err := validation.ValidateStruct(&req); err != nil {
 		return utils.HandleValidationError(c, err)
 	}
 
-	user := model.User{
-		ID:       uint(id),
-		Name:     req.Name,
-		Email:    req.Email,
-		Password: req.Password,
+	user, err := service.GetUserByID(uint(id))
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(fiber.StatusNotFound).
+				JSON(res.ErrorResponse("User not found", err))
+		}
+		return utils.HandleServerError(c, err)
+	}
+
+	if req.Name != "" {
+		user.Name = req.Name
+	}
+	if req.Email != "" {
+		user.Email = req.Email
+	}
+	if req.Password != "" {
+		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return utils.HandleServerError(c, err)
+		}
+		user.Password = string(hashed)
 	}
 
 	if err := service.UpdateUser(&user); err != nil {
 		return utils.HandleServerError(c, err)
 	}
 
+	user.Password = ""
 	return c.JSON(res.SuccessResponse("User updated successfully", user))
 }
 
@@ -144,13 +177,23 @@ func UpdateUser(c *fiber.Ctx) error {
 // @Param        id   path      int  true  "User ID"
 // @Success      200 {object} res.Response
 // @Failure      400 {object} res.Response
+// @Failure      404 {object} res.Response
 // @Failure      500 {object} res.Response
 // @Router       /users/{id} [delete]
 func DeleteUser(c *fiber.Ctx) error {
 	id, err := strconv.Atoi(c.Params("id"))
 	if err != nil {
 		return c.Status(fiber.StatusBadRequest).
-			JSON(res.ErrorResponse("Invalid user ID", err.Error()))
+			JSON(res.ErrorResponse("Invalid user ID", err))
+	}
+
+	_, err = service.GetUserByID(uint(id))
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return c.Status(fiber.StatusNotFound).
+				JSON(res.ErrorResponse("User not found", err))
+		}
+		return utils.HandleServerError(c, err)
 	}
 
 	if err := service.DeleteUser(uint(id)); err != nil {
