@@ -2,19 +2,21 @@ package router
 
 import (
 	"go-journey/src/controller"
-	_ "go-journey/src/docs"
+	"go-journey/src/middleware"
 
 	"github.com/gofiber/fiber/v2"
-	"github.com/gofiber/swagger"
 )
 
 func UserRoutes(app *fiber.App) {
-	api := app.Group("/users")
-	api.Get("/", controller.GetUsers)
-	api.Get("/:id", controller.GetUser)
-	api.Post("/", controller.CreateUser)
-	api.Put("/:id", controller.UpdateUser)
-	api.Delete("/:id", controller.DeleteUser)
+	user := app.Group("/users")
 
-	app.Get("/swagger/*", swagger.HandlerDefault)
+	// 🔓 Public routes
+	user.Get("/", controller.GetUsers)
+	user.Get("/:id", controller.GetUser)
+
+	// 🔒 Protected routes
+	user.Use(middleware.Auth())
+	user.Post("/", controller.CreateUser)
+	user.Put("/:id", controller.UpdateUser)
+	user.Delete("/:id", controller.DeleteUser)
 }

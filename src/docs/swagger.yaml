@@ -1,5 +1,29 @@
 basePath: /
 definitions:
+  controller.LoginRequest:
+    properties:
+      email:
+        type: string
+      password:
+        type: string
+    required:
+    - email
+    - password
+    type: object
+  controller.RegisterRequest:
+    properties:
+      email:
+        type: string
+      name:
+        type: string
+      password:
+        minLength: 6
+        type: string
+    required:
+    - email
+    - name
+    - password
+    type: object
   model.User:
     properties:
       created_at:
@@ -10,16 +34,17 @@ definitions:
         type: integer
       name:
         type: string
-      password:
-        type: string
       updated_at:
         type: string
     type: object
   res.Response:
     properties:
       data: {}
-      error: {}
+      error:
+        type: string
       message:
+        type: string
+      status:
         type: string
       success:
         type: boolean
@@ -58,6 +83,160 @@ info:
   title: User API
   version: "1.0"
 paths:
+  /auth/check:
+    get:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/res.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/res.Response'
+      security:
+      - Bearer: []
+      summary: Check token validity
+      tags:
+      - Auth
+  /auth/login:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Login payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/controller.LoginRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/res.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/res.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/res.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/res.Response'
+      summary: Login user
+      tags:
+      - Auth
+  /auth/logout:
+    post:
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/res.Response'
+      security:
+      - Bearer: []
+      summary: Logout user
+      tags:
+      - Auth
+  /auth/refresh:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: refresh token
+        in: body
+        name: payload
+        required: true
+        schema:
+          additionalProperties:
+            type: string
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            allOf:
+            - $ref: '#/definitions/res.Response'
+            - properties:
+                data:
+                  additionalProperties:
+                    type: string
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/res.Response'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/res.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/res.Response'
+      summary: Refresh access token
+      tags:
+      - Auth
+  /auth/register:
+    post:
+      consumes:
+      - application/json
+      parameters:
+      - description: Register payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/controller.RegisterRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            allOf:
+            - $ref: '#/definitions/res.Response'
+            - properties:
+                data:
+                  additionalProperties: true
+                  type: object
+              type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/res.Response'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/res.Response'
+      summary: Register a new user
+      tags:
+      - Auth
   /users:
     get:
       description: Get list of users
@@ -113,6 +292,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/res.Response'
+      security:
+      - Bearer: []
       summary: Create new user
       tags:
       - users
@@ -136,10 +317,16 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/res.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/res.Response'
         "500":
           description: Internal Server Error
           schema:
             $ref: '#/definitions/res.Response'
+      security:
+      - Bearer: []
       summary: Delete user
       tags:
       - users
@@ -210,6 +397,10 @@ paths:
           description: Bad Request
           schema:
             $ref: '#/definitions/res.Response'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/res.Response'
         "500":
           description: Internal Server Error
           schema:
@@ -217,4 +408,10 @@ paths:
       summary: Update user
       tags:
       - users
+securityDefinitions:
+  Bearer:
+    description: Type "Bearer {your token}" (without quotes)
+    in: header
+    name: Authorization
+    type: apiKey
 swagger: "2.0"
