@@ -292,6 +292,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/res.Response'
+      security:
+      - Bearer: []
       summary: Create new user
       tags:
       - users
@@ -323,6 +325,8 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/res.Response'
+      security:
+      - Bearer: []
       summary: Delete user
       tags:
       - users

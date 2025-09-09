@@ -308,6 +308,11 @@
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
                 "description": "Create a new user with name, email and password",
                 "consumes": [
                     "application/json"
@@ -492,6 +497,11 @@
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
                 "description": "Delete user by ID",
                 "produces": [
                     "application/json"

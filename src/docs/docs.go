@@ -314,6 +314,11 @@ const docTemplate = `{
                 }
             },
             "post": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
                 "description": "Create a new user with name, email and password",
                 "consumes": [
                     "application/json"
@@ -498,6 +503,11 @@ const docTemplate = `{
                 }
             },
             "delete": {
+                "security": [
+                    {
+                        "Bearer": []
+                    }
+                ],
                 "description": "Delete user by ID",
                 "produces": [
                     "application/json"

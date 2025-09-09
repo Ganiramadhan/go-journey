@@ -11,7 +11,7 @@ func Auth() fiber.Handler {
 		tokenStr := c.Get("Authorization")
 		if tokenStr == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
-				"message": "missing token",
+				"message": "unauthorized",
 			})
 		}
 
