@@ -19,29 +19,39 @@ import (
 	"github.com/gofiber/fiber/v2/middleware/recover"
 	"github.com/joho/godotenv"
 
-	_ "go-journey/src/docs" // Swagger docs
+	"go-journey/src/docs"
 )
 
 // @title           User API
 // @version         1.0
 // @description     API service for managing users
-// @host            localhost:8080
+// @host            127.0.0.1:8080
 // @BasePath        /
-
 // @securityDefinitions.apikey Bearer
 // @in header
 // @name Authorization
 // @description Type "Bearer {your token}" (without quotes)
 func main() {
-	// Load .env
-	if err := godotenv.Load(); err != nil {
-		log.Println("⚠️ No .env file found, using system env")
+	env := os.Getenv("APP_ENV")
+	if env == "production" {
+		if err := godotenv.Load(".env.production"); err != nil {
+			log.Println("⚠️ No .env.production file found, using system env")
+		} else {
+			log.Println("✅ Loaded .env.production")
+		}
+	} else {
+		if err := godotenv.Load(".env"); err != nil {
+			log.Println("⚠️ No .env file found, using system env")
+		} else {
+			log.Println("✅ Loaded .env")
+		}
 	}
 
+	// Database connection
 	database.ConnectDB()
-
 	migrations.Migrate()
 
+	// Fiber app config
 	app := fiber.New(fiber.Config{
 		AppName:       "User API v1.0",
 		Prefork:       false,
@@ -65,30 +75,42 @@ func main() {
 	}))
 	app.Use(recover.New())
 
-	// CORS (allow origins from ENV)
+	// CORS
 	app.Use(cors.New(cors.Config{
 		AllowOrigins: os.Getenv("CORS_ALLOW_ORIGINS"),
 		AllowMethods: "GET,POST,PUT,DELETE,OPTIONS",
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
+	// Routes
 	router.UserRoutes(app)
 	router.AuthRoutes(app)
 	router.DocsRoutes(app)
 
+	// Port
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "8080"
+		port = "9001"
 	}
 	addr := fmt.Sprintf(":%s", port)
 
+	swaggerHost := os.Getenv("SWAGGER_HOST")
+	if swaggerHost == "" {
+		swaggerHost = fmt.Sprintf("127.0.0.1:%s", port)
+	}
+	docs.SwaggerInfo.Host = swaggerHost
+
+	log.Printf("📘 Swagger running at http://%s/docs/index.html", swaggerHost)
+
+	// Start server
 	go func() {
-		log.Printf("🚀 Server running at http://localhost%s", addr)
+		log.Printf("🚀 Server running at 0.0.0.0%s", addr)
 		if err := app.Listen(addr); err != nil {
 			log.Fatalf("❌ Failed to start server: %v", err)
 		}
 	}()
 
+	// Graceful shutdown
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
