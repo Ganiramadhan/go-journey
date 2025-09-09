@@ -22,6 +22,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
+                "description": "Verify if the token is valid and the user is active",
                 "produces": [
                     "application/json"
                 ],
@@ -60,6 +61,7 @@ const docTemplate = `{
         },
         "/auth/login": {
             "post": {
+                "description": "Login with email and password, returns access \u0026 refresh tokens",
                 "consumes": [
                     "application/json"
                 ],
@@ -129,6 +131,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
+                "description": "Logout user (stateless, no server-side session)",
                 "produces": [
                     "application/json"
                 ],
@@ -148,6 +151,7 @@ const docTemplate = `{
         },
         "/auth/refresh": {
             "post": {
+                "description": "Use refresh token to get a new access token",
                 "consumes": [
                     "application/json"
                 ],
@@ -160,7 +164,7 @@ const docTemplate = `{
                 "summary": "Refresh access token",
                 "parameters": [
                     {
-                        "description": "refresh token",
+                        "description": "Refresh token payload",
                         "name": "payload",
                         "in": "body",
                         "required": true,
@@ -217,6 +221,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
+                "description": "Register a new user with role 'guest' or 'admin'",
                 "consumes": [
                     "application/json"
                 ],
@@ -587,6 +592,9 @@ const docTemplate = `{
                 "password": {
                     "type": "string",
                     "minLength": 6
+                },
+                "role": {
+                    "type": "string"
                 }
             }
         },
@@ -603,6 +611,9 @@ const docTemplate = `{
                     "type": "integer"
                 },
                 "name": {
+                    "type": "string"
+                },
+                "role": {
                     "type": "string"
                 },
                 "updated_at": {

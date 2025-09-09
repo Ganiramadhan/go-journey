@@ -19,6 +19,8 @@ definitions:
       password:
         minLength: 6
         type: string
+      role:
+        type: string
     required:
     - email
     - name
@@ -33,6 +35,8 @@ definitions:
       id:
         type: integer
       name:
+        type: string
+      role:
         type: string
       updated_at:
         type: string
@@ -85,6 +89,7 @@ info:
 paths:
   /auth/check:
     get:
+      description: Verify if the token is valid and the user is active
       produces:
       - application/json
       responses:
@@ -111,6 +116,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: Login with email and password, returns access & refresh tokens
       parameters:
       - description: Login payload
         in: body
@@ -148,6 +154,7 @@ paths:
       - Auth
   /auth/logout:
     post:
+      description: Logout user (stateless, no server-side session)
       produces:
       - application/json
       responses:
@@ -164,8 +171,9 @@ paths:
     post:
       consumes:
       - application/json
+      description: Use refresh token to get a new access token
       parameters:
-      - description: refresh token
+      - description: Refresh token payload
         in: body
         name: payload
         required: true
@@ -206,6 +214,7 @@ paths:
     post:
       consumes:
       - application/json
+      description: Register a new user with role 'guest' or 'admin'
       parameters:
       - description: Register payload
         in: body

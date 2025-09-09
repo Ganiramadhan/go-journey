@@ -17,6 +17,7 @@ type RegisterRequest struct {
 	Name     string `json:"name" validate:"required"`
 	Email    string `json:"email" validate:"required,email"`
 	Password string `json:"password" validate:"required,min=6"`
+	Role     string `json:"role"`
 }
 
 type LoginRequest struct {
@@ -26,6 +27,7 @@ type LoginRequest struct {
 
 // ===================== REGISTER =====================
 // @Summary Register a new user
+// @Description Register a new user with role 'guest' or 'admin'
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -43,21 +45,22 @@ func Register(c *fiber.Ctx) error {
 		return utils.HandleValidationError(c, err)
 	}
 
-	// cek apakah email sudah dipakai
+	if req.Role == "" {
+		req.Role = "guest"
+	}
+
 	var count int64
 	database.DB.Model(&model.User{}).Where("email = ?", req.Email).Count(&count)
 	if count > 0 {
-		return c.Status(fiber.StatusBadRequest).
-			JSON(res.ErrorResponse("Email already used", nil))
+		return c.Status(fiber.StatusBadRequest).JSON(res.ErrorResponse("Email already used", nil))
 	}
 
-	// hash password
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
 		return utils.HandleServerError(c, err)
 	}
 
-	user := model.User{Name: req.Name, Email: req.Email, Password: string(hash)}
+	user := model.User{Name: req.Name, Email: req.Email, Password: string(hash), Role: req.Role}
 	if err := database.DB.Create(&user).Error; err != nil {
 		return utils.HandleServerError(c, err)
 	}
@@ -67,22 +70,23 @@ func Register(c *fiber.Ctx) error {
 		return utils.HandleServerError(c, err)
 	}
 
-	return c.Status(fiber.StatusCreated).
-		JSON(res.SuccessResponse("User registered successfully", fiber.Map{
-			"user": fiber.Map{
-				"id":    user.ID,
-				"name":  user.Name,
-				"email": user.Email,
-			},
-			"tokens": fiber.Map{
-				"accessToken":  tokens.AccessToken,
-				"refreshToken": tokens.RefreshToken,
-			},
-		}))
+	return c.Status(fiber.StatusCreated).JSON(res.SuccessResponse("User registered successfully", fiber.Map{
+		"user": fiber.Map{
+			"id":    user.ID,
+			"name":  user.Name,
+			"email": user.Email,
+			"role":  user.Role,
+		},
+		"tokens": fiber.Map{
+			"accessToken":  tokens.AccessToken,
+			"refreshToken": tokens.RefreshToken,
+		},
+	}))
 }
 
 // ===================== LOGIN =====================
 // @Summary Login user
+// @Description Login with email and password, returns access & refresh tokens
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -103,13 +107,11 @@ func Login(c *fiber.Ctx) error {
 
 	var user model.User
 	if err := database.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
-		return c.Status(fiber.StatusUnauthorized).
-			JSON(res.ErrorResponse("Invalid credentials", nil))
+		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid credentials", nil))
 	}
 
 	if err := bcrypt.CompareHashAndPassword([]byte(user.Password), []byte(req.Password)); err != nil {
-		return c.Status(fiber.StatusUnauthorized).
-			JSON(res.ErrorResponse("Invalid credentials", nil))
+		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid credentials", nil))
 	}
 
 	tokens, err := utils.GenerateTokenPair(user.ID)
@@ -122,6 +124,7 @@ func Login(c *fiber.Ctx) error {
 			"id":    user.ID,
 			"name":  user.Name,
 			"email": user.Email,
+			"role":  user.Role,
 		},
 		"tokens": fiber.Map{
 			"accessToken":  tokens.AccessToken,
@@ -132,10 +135,11 @@ func Login(c *fiber.Ctx) error {
 
 // ===================== REFRESH TOKEN =====================
 // @Summary Refresh access token
+// @Description Use refresh token to get a new access token
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param payload body map[string]string true "refresh token"
+// @Param payload body map[string]string true "Refresh token payload"
 // @Success 200 {object} res.Response{data=map[string]string}
 // @Failure 400 {object} res.Response
 // @Failure 401 {object} res.Response
@@ -154,25 +158,21 @@ func Refresh(c *fiber.Ctx) error {
 
 	t, claims, err := utils.ParseToken(body.RefreshToken)
 	if err != nil || !t.Valid {
-		return c.Status(fiber.StatusUnauthorized).
-			JSON(res.ErrorResponse("Invalid or expired token", nil))
+		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid or expired token", nil))
 	}
 
 	if typ, _ := claims["type"].(string); typ != "refresh" {
-		return c.Status(fiber.StatusUnauthorized).
-			JSON(res.ErrorResponse("Invalid token type", nil))
+		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid token type", nil))
 	}
 
 	subStr, ok := claims["sub"].(string)
 	if !ok {
-		return c.Status(fiber.StatusUnauthorized).
-			JSON(res.ErrorResponse("Invalid subject", nil))
+		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid subject", nil))
 	}
 
 	sub, err := strconv.ParseUint(subStr, 10, 64)
 	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).
-			JSON(res.ErrorResponse("Invalid subject format", nil))
+		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid subject format", nil))
 	}
 
 	tokens, err := utils.GenerateTokenPair(uint(sub))
@@ -188,18 +188,19 @@ func Refresh(c *fiber.Ctx) error {
 
 // ===================== LOGOUT =====================
 // @Summary Logout user
+// @Description Logout user (stateless, no server-side session)
 // @Tags Auth
 // @Produce json
 // @Security Bearer
 // @Success 200 {object} res.Response
 // @Router /auth/logout [post]
 func Logout(c *fiber.Ctx) error {
-	// stateless → cukup balikan sukses
 	return c.JSON(res.SuccessResponse("Logout successful", nil))
 }
 
 // ===================== CHECK TOKEN =====================
 // @Summary Check token validity
+// @Description Verify if the token is valid and the user is active
 // @Tags Auth
 // @Produce json
 // @Security Bearer
@@ -208,7 +209,6 @@ func Logout(c *fiber.Ctx) error {
 // @Router /auth/check [get]
 func CheckToken(c *fiber.Ctx) error {
 	userID := c.Locals("userID").(uint)
-
 	return c.JSON(res.SuccessResponse("Token is valid", fiber.Map{
 		"userID": userID,
 	}))

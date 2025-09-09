@@ -15,8 +15,11 @@ func UserRoutes(app *fiber.App) {
 	user.Get("/:id", controller.GetUser)
 
 	// 🔒 Protected routes
-	user.Use(middleware.Auth())
-	user.Post("/", controller.CreateUser)
-	user.Put("/:id", controller.UpdateUser)
-	user.Delete("/:id", controller.DeleteUser)
+	protected := user.Group("/", middleware.Auth())
+
+	// 🔐 Admin-only routes
+	admin := protected.Group("/", middleware.RoleMiddleware("admin"))
+	admin.Post("/", controller.CreateUser)
+	admin.Put("/:id", controller.UpdateUser)
+	admin.Delete("/:id", controller.DeleteUser)
 }
