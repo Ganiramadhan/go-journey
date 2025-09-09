@@ -38,20 +38,16 @@ func main() {
 		log.Println("⚠️ No .env file found, using system env")
 	}
 
-	// Connect DB
 	database.ConnectDB()
 
-	// Run migrations
 	migrations.Migrate()
 
-	// Fiber config
 	app := fiber.New(fiber.Config{
 		AppName:       "User API v1.0",
 		Prefork:       false,
 		CaseSensitive: true,
-		StrictRouting: true,
+		StrictRouting: false,
 		ErrorHandler: func(c *fiber.Ctx, err error) error {
-			// Default 500
 			code := fiber.StatusInternalServerError
 			if e, ok := err.(*fiber.Error); ok {
 				code = e.Code
@@ -76,19 +72,16 @@ func main() {
 		AllowHeaders: "Origin, Content-Type, Accept, Authorization",
 	}))
 
-	// Routes
 	router.UserRoutes(app)
 	router.AuthRoutes(app)
 	router.DocsRoutes(app)
 
-	// Port dari ENV
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
 	}
 	addr := fmt.Sprintf(":%s", port)
 
-	// Graceful shutdown
 	go func() {
 		log.Printf("🚀 Server running at http://localhost%s", addr)
 		if err := app.Listen(addr); err != nil {
@@ -96,7 +89,6 @@ func main() {
 		}
 	}()
 
-	// Wait for interrupt signal
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
