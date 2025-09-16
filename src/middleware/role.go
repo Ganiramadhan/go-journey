@@ -9,10 +9,15 @@ import (
 
 func RoleMiddleware(allowedRoles ...string) fiber.Handler {
 	return func(c *fiber.Ctx) error {
-		userID := c.Locals("userID").(uint)
+		userID, ok := c.Locals("userID").(string)
+		if !ok {
+			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
+				"message": "invalid user id in context",
+			})
+		}
 
 		var user model.User
-		if err := database.DB.First(&user, userID).Error; err != nil {
+		if err := database.DB.First(&user, "id = ?", userID).Error; err != nil {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"message": "user not found",
 			})

@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"strconv"
-
 	"go-journey/src/model"
 	"go-journey/src/res"
 	"go-journey/src/service"
@@ -11,7 +9,6 @@ import (
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
-	"gorm.io/gorm"
 )
 
 // @Summary      Get all users
@@ -35,24 +32,24 @@ func GetUsers(c *fiber.Ctx) error {
 }
 
 // @Summary      Get user by ID
-// @Description  Get user detail by ID
+// @Description  Get user detail by ID (UUID)
 // @Tags         users
 // @Produce      json
-// @Param        id   path      int  true  "User ID"
+// @Param        id   path      string  true  "User UUID"
 // @Success      200 {object} res.Response{data=model.User}
 // @Failure      400 {object} res.Response
 // @Failure      404 {object} res.Response
 // @Failure      500 {object} res.Response
 // @Router       /users/{id} [get]
 func GetUser(c *fiber.Ctx) error {
-	id, err := strconv.Atoi(c.Params("id"))
-	if err != nil {
-		return utils.HandleValidationError(c, err)
+	id := c.Params("id")
+	if id == "" {
+		return utils.HandleValidationError(c, fiber.NewError(fiber.StatusBadRequest, "ID is required"))
 	}
 
-	user, err := service.GetUserByID(uint(id))
+	user, err := service.GetUserByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if err.Error() == "record not found" {
 			return c.Status(fiber.StatusNotFound).
 				JSON(res.ErrorResponse("User not found", nil))
 		}
@@ -64,7 +61,7 @@ func GetUser(c *fiber.Ctx) error {
 }
 
 // @Summary      Create new user
-// @Description  Create a new user with name, email and password
+// @Description  Create a new user with username, fullname and password
 // @Tags         users
 // @Accept       json
 // @Produce      json
@@ -90,9 +87,10 @@ func CreateUser(c *fiber.Ctx) error {
 	}
 
 	user := model.User{
-		Name:     req.Name,
-		Email:    req.Email,
+		Username: req.Username,
+		FullName: req.FullName,
 		Password: string(hashed),
+		Role:     req.Role,
 	}
 
 	if err := service.CreateUser(&user); err != nil {
@@ -105,21 +103,21 @@ func CreateUser(c *fiber.Ctx) error {
 }
 
 // @Summary      Update user
-// @Description  Update user by ID
+// @Description  Update user by ID (UUID)
 // @Tags         users
 // @Accept       json
 // @Produce      json
-// @Param        id    path      int                          true  "User ID"
-// @Param        user  body      validation.UpdateUserRequest  true "User data"
+// @Param        id    path      string                        true  "User UUID"
+// @Param        user  body      validation.UpdateUserRequest  true  "User data"
 // @Success      200 {object} res.Response{data=model.User}
 // @Failure      400 {object} res.Response
 // @Failure      404 {object} res.Response
 // @Failure      500 {object} res.Response
 // @Router       /users/{id} [put]
 func UpdateUser(c *fiber.Ctx) error {
-	id, err := strconv.Atoi(c.Params("id"))
-	if err != nil {
-		return utils.HandleValidationError(c, err)
+	id := c.Params("id")
+	if id == "" {
+		return utils.HandleValidationError(c, fiber.NewError(fiber.StatusBadRequest, "ID is required"))
 	}
 
 	var req validation.UpdateUserRequest
@@ -131,9 +129,9 @@ func UpdateUser(c *fiber.Ctx) error {
 		return utils.HandleValidationError(c, err)
 	}
 
-	user, err := service.GetUserByID(uint(id))
+	user, err := service.GetUserByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if err.Error() == "record not found" {
 			return c.Status(fiber.StatusNotFound).
 				JSON(res.ErrorResponse("User not found", nil))
 		}
@@ -141,11 +139,11 @@ func UpdateUser(c *fiber.Ctx) error {
 	}
 
 	// Apply updates
-	if req.Name != "" {
-		user.Name = req.Name
+	if req.Username != "" {
+		user.Username = req.Username
 	}
-	if req.Email != "" {
-		user.Email = req.Email
+	if req.FullName != "" {
+		user.FullName = req.FullName
 	}
 	if req.Password != "" {
 		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -153,6 +151,9 @@ func UpdateUser(c *fiber.Ctx) error {
 			return utils.HandleServerError(c, err)
 		}
 		user.Password = string(hashed)
+	}
+	if req.Role != "" {
+		user.Role = req.Role
 	}
 
 	if err := service.UpdateUser(&user); err != nil {
@@ -164,32 +165,32 @@ func UpdateUser(c *fiber.Ctx) error {
 }
 
 // @Summary      Delete user
-// @Description  Delete user by ID
+// @Description  Delete user by ID (UUID)
 // @Tags         users
 // @Produce      json
 // @Security Bearer
-// @Param        id   path      int  true  "User ID"
+// @Param        id   path      string  true  "User UUID"
 // @Success      200 {object} res.Response
 // @Failure      400 {object} res.Response
 // @Failure      404 {object} res.Response
 // @Failure      500 {object} res.Response
 // @Router       /users/{id} [delete]
 func DeleteUser(c *fiber.Ctx) error {
-	id, err := strconv.Atoi(c.Params("id"))
-	if err != nil {
-		return utils.HandleValidationError(c, err)
+	id := c.Params("id")
+	if id == "" {
+		return utils.HandleValidationError(c, fiber.NewError(fiber.StatusBadRequest, "ID is required"))
 	}
 
-	_, err = service.GetUserByID(uint(id))
+	_, err := service.GetUserByID(id)
 	if err != nil {
-		if err == gorm.ErrRecordNotFound {
+		if err.Error() == "record not found" {
 			return c.Status(fiber.StatusNotFound).
 				JSON(res.ErrorResponse("User not found", nil))
 		}
 		return utils.HandleServerError(c, err)
 	}
 
-	if err := service.DeleteUser(uint(id)); err != nil {
+	if err := service.DeleteUser(id); err != nil {
 		return utils.HandleServerError(c, err)
 	}
 

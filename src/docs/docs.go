@@ -15,53 +15,9 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/auth/check": {
-            "get": {
-                "security": [
-                    {
-                        "Bearer": []
-                    }
-                ],
-                "description": "Verify if the token is valid and the user is active",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "Auth"
-                ],
-                "summary": "Check token validity",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "allOf": [
-                                {
-                                    "$ref": "#/definitions/res.Response"
-                                },
-                                {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object",
-                                            "additionalProperties": true
-                                        }
-                                    }
-                                }
-                            ]
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/res.Response"
-                        }
-                    }
-                }
-            }
-        },
         "/auth/login": {
             "post": {
-                "description": "Login with email and password, returns access \u0026 refresh tokens",
+                "description": "Login with username and password, returns access \u0026 refresh tokens",
                 "consumes": [
                     "application/json"
                 ],
@@ -79,7 +35,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/controller.LoginRequest"
+                            "$ref": "#/definitions/validation.LoginRequest"
                         }
                     }
                 ],
@@ -169,10 +125,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/validation.RefreshRequest"
                         }
                     }
                 ],
@@ -239,7 +192,7 @@ const docTemplate = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/controller.RegisterRequest"
+                            "$ref": "#/definitions/validation.RegisterRequest"
                         }
                     }
                 ],
@@ -324,7 +277,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Create a new user with name, email and password",
+                "description": "Create a new user with username, fullname and password",
                 "consumes": [
                     "application/json"
                 ],
@@ -382,7 +335,7 @@ const docTemplate = `{
         },
         "/users/{id}": {
             "get": {
-                "description": "Get user detail by ID",
+                "description": "Get user detail by ID (UUID)",
                 "produces": [
                     "application/json"
                 ],
@@ -392,8 +345,8 @@ const docTemplate = `{
                 "summary": "Get user by ID",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "User ID",
+                        "type": "string",
+                        "description": "User UUID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -439,7 +392,7 @@ const docTemplate = `{
                 }
             },
             "put": {
-                "description": "Update user by ID",
+                "description": "Update user by ID (UUID)",
                 "consumes": [
                     "application/json"
                 ],
@@ -452,8 +405,8 @@ const docTemplate = `{
                 "summary": "Update user",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "User ID",
+                        "type": "string",
+                        "description": "User UUID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -513,7 +466,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Delete user by ID",
+                "description": "Delete user by ID (UUID)",
                 "produces": [
                     "application/json"
                 ],
@@ -523,8 +476,8 @@ const docTemplate = `{
                 "summary": "Delete user",
                 "parameters": [
                     {
-                        "type": "integer",
-                        "description": "User ID",
+                        "type": "string",
+                        "description": "User UUID",
                         "name": "id",
                         "in": "path",
                         "required": true
@@ -560,63 +513,34 @@ const docTemplate = `{
         }
     },
     "definitions": {
-        "controller.LoginRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "password"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string"
-                }
-            }
-        },
-        "controller.RegisterRequest": {
-            "type": "object",
-            "required": [
-                "email",
-                "name",
-                "password"
-            ],
-            "properties": {
-                "email": {
-                    "type": "string"
-                },
-                "name": {
-                    "type": "string"
-                },
-                "password": {
-                    "type": "string",
-                    "minLength": 6
-                },
-                "role": {
-                    "type": "string"
-                }
-            }
-        },
         "model.User": {
             "type": "object",
             "properties": {
                 "created_at": {
                     "type": "string"
                 },
-                "email": {
+                "esign_id": {
+                    "type": "string"
+                },
+                "esign_status_id": {
+                    "type": "string"
+                },
+                "full_name": {
                     "type": "string"
                 },
                 "id": {
-                    "type": "integer"
+                    "type": "string"
                 },
-                "name": {
+                "register_date": {
                     "type": "string"
                 },
                 "role": {
                     "type": "string"
                 },
                 "updated_at": {
+                    "type": "string"
+                },
+                "username": {
                     "type": "string"
                 }
             }
@@ -642,39 +566,109 @@ const docTemplate = `{
         "validation.CreateUserRequest": {
             "type": "object",
             "required": [
-                "email",
-                "name",
-                "password"
+                "fullName",
+                "password",
+                "username"
             ],
             "properties": {
-                "email": {
+                "esignId": {
                     "type": "string"
                 },
-                "name": {
+                "esignStatusId": {
+                    "type": "string"
+                },
+                "fullName": {
+                    "type": "string",
+                    "minLength": 3
+                },
+                "password": {
+                    "type": "string",
+                    "minLength": 6
+                },
+                "registerDate": {
+                    "type": "string"
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string",
+                    "minLength": 3
+                }
+            }
+        },
+        "validation.LoginRequest": {
+            "type": "object",
+            "required": [
+                "password",
+                "username"
+            ],
+            "properties": {
+                "password": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
+                }
+            }
+        },
+        "validation.RefreshRequest": {
+            "type": "object",
+            "required": [
+                "refreshToken"
+            ],
+            "properties": {
+                "refreshToken": {
+                    "type": "string"
+                }
+            }
+        },
+        "validation.RegisterRequest": {
+            "type": "object",
+            "required": [
+                "full_name",
+                "password",
+                "username"
+            ],
+            "properties": {
+                "full_name": {
                     "type": "string"
                 },
                 "password": {
                     "type": "string",
                     "minLength": 6
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string"
                 }
             }
         },
         "validation.UpdateUserRequest": {
             "type": "object",
-            "required": [
-                "email",
-                "name"
-            ],
             "properties": {
-                "email": {
+                "esignId": {
                     "type": "string"
                 },
-                "name": {
+                "esignStatusId": {
                     "type": "string"
+                },
+                "fullName": {
+                    "type": "string",
+                    "minLength": 3
                 },
                 "password": {
                     "type": "string",
                     "minLength": 6
+                },
+                "role": {
+                    "type": "string"
+                },
+                "username": {
+                    "type": "string",
+                    "minLength": 3
                 }
             }
         }

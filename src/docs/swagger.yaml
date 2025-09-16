@@ -1,44 +1,24 @@
 basePath: /
 definitions:
-  controller.LoginRequest:
-    properties:
-      email:
-        type: string
-      password:
-        type: string
-    required:
-    - email
-    - password
-    type: object
-  controller.RegisterRequest:
-    properties:
-      email:
-        type: string
-      name:
-        type: string
-      password:
-        minLength: 6
-        type: string
-      role:
-        type: string
-    required:
-    - email
-    - name
-    - password
-    type: object
   model.User:
     properties:
       created_at:
         type: string
-      email:
+      esign_id:
+        type: string
+      esign_status_id:
+        type: string
+      full_name:
         type: string
       id:
-        type: integer
-      name:
+        type: string
+      register_date:
         type: string
       role:
         type: string
       updated_at:
+        type: string
+      username:
         type: string
     type: object
   res.Response:
@@ -55,30 +35,78 @@ definitions:
     type: object
   validation.CreateUserRequest:
     properties:
-      email:
+      esignId:
         type: string
-      name:
+      esignStatusId:
+        type: string
+      fullName:
+        minLength: 3
         type: string
       password:
         minLength: 6
         type: string
+      registerDate:
+        type: string
+      role:
+        type: string
+      username:
+        minLength: 3
+        type: string
     required:
-    - email
-    - name
+    - fullName
     - password
+    - username
+    type: object
+  validation.LoginRequest:
+    properties:
+      password:
+        type: string
+      username:
+        type: string
+    required:
+    - password
+    - username
+    type: object
+  validation.RefreshRequest:
+    properties:
+      refreshToken:
+        type: string
+    required:
+    - refreshToken
+    type: object
+  validation.RegisterRequest:
+    properties:
+      full_name:
+        type: string
+      password:
+        minLength: 6
+        type: string
+      role:
+        type: string
+      username:
+        type: string
+    required:
+    - full_name
+    - password
+    - username
     type: object
   validation.UpdateUserRequest:
     properties:
-      email:
+      esignId:
         type: string
-      name:
+      esignStatusId:
+        type: string
+      fullName:
+        minLength: 3
         type: string
       password:
         minLength: 6
         type: string
-    required:
-    - email
-    - name
+      role:
+        type: string
+      username:
+        minLength: 3
+        type: string
     type: object
 host: 127.0.0.1:8080
 info:
@@ -87,43 +115,18 @@ info:
   title: User API
   version: "1.0"
 paths:
-  /auth/check:
-    get:
-      description: Verify if the token is valid and the user is active
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            allOf:
-            - $ref: '#/definitions/res.Response'
-            - properties:
-                data:
-                  additionalProperties: true
-                  type: object
-              type: object
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/res.Response'
-      security:
-      - Bearer: []
-      summary: Check token validity
-      tags:
-      - Auth
   /auth/login:
     post:
       consumes:
       - application/json
-      description: Login with email and password, returns access & refresh tokens
+      description: Login with username and password, returns access & refresh tokens
       parameters:
       - description: Login payload
         in: body
         name: payload
         required: true
         schema:
-          $ref: '#/definitions/controller.LoginRequest'
+          $ref: '#/definitions/validation.LoginRequest'
       produces:
       - application/json
       responses:
@@ -178,9 +181,7 @@ paths:
         name: payload
         required: true
         schema:
-          additionalProperties:
-            type: string
-          type: object
+          $ref: '#/definitions/validation.RefreshRequest'
       produces:
       - application/json
       responses:
@@ -221,7 +222,7 @@ paths:
         name: payload
         required: true
         schema:
-          $ref: '#/definitions/controller.RegisterRequest'
+          $ref: '#/definitions/validation.RegisterRequest'
       produces:
       - application/json
       responses:
@@ -273,7 +274,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Create a new user with name, email and password
+      description: Create a new user with username, fullname and password
       parameters:
       - description: User data
         in: body
@@ -308,13 +309,13 @@ paths:
       - users
   /users/{id}:
     delete:
-      description: Delete user by ID
+      description: Delete user by ID (UUID)
       parameters:
-      - description: User ID
+      - description: User UUID
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -340,13 +341,13 @@ paths:
       tags:
       - users
     get:
-      description: Get user detail by ID
+      description: Get user detail by ID (UUID)
       parameters:
-      - description: User ID
+      - description: User UUID
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       produces:
       - application/json
       responses:
@@ -377,13 +378,13 @@ paths:
     put:
       consumes:
       - application/json
-      description: Update user by ID
+      description: Update user by ID (UUID)
       parameters:
-      - description: User ID
+      - description: User UUID
         in: path
         name: id
         required: true
-        type: integer
+        type: string
       - description: User data
         in: body
         name: user

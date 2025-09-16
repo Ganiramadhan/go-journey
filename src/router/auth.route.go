@@ -18,5 +18,4 @@ func AuthRoutes(app *fiber.App) {
 	// 🔒 Protected routes
 	auth.Use(middleware.Auth())
 	auth.Post("/logout", controller.Logout)
-	auth.Get("/check", controller.CheckToken)
 }

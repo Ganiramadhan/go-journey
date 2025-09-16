@@ -9,6 +9,7 @@ import (
 func Auth() fiber.Handler {
 	return func(c *fiber.Ctx) error {
 		tokenStr := c.Get("Authorization")
+
 		if tokenStr == "" {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"message": "unauthorized",
@@ -28,14 +29,14 @@ func Auth() fiber.Handler {
 			})
 		}
 
-		sub, ok := claims["sub"].(float64)
+		sub, ok := claims["sub"].(string)
 		if !ok {
 			return c.Status(fiber.StatusUnauthorized).JSON(fiber.Map{
 				"message": "invalid subject",
 			})
 		}
 
-		c.Locals("userID", uint(sub))
+		c.Locals("userID", sub)
 		return c.Next()
 	}
 }

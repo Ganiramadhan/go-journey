@@ -1,8 +1,6 @@
 package controller
 
 import (
-	"strconv"
-
 	"go-journey/src/database"
 	"go-journey/src/model"
 	"go-journey/src/res"
@@ -13,31 +11,19 @@ import (
 	"golang.org/x/crypto/bcrypt"
 )
 
-type RegisterRequest struct {
-	Name     string `json:"name" validate:"required"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,min=6"`
-	Role     string `json:"role"`
-}
-
-type LoginRequest struct {
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required"`
-}
-
 // ===================== REGISTER =====================
 // @Summary Register a new user
 // @Description Register a new user with role 'guest' or 'admin'
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param payload body RegisterRequest true "Register payload"
+// @Param payload body validation.RegisterRequest true "Register payload"
 // @Success 201 {object} res.Response{data=map[string]interface{}}
 // @Failure 400 {object} res.Response
 // @Failure 500 {object} res.Response
 // @Router /auth/register [post]
 func Register(c *fiber.Ctx) error {
-	var req RegisterRequest
+	var req validation.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
 		return utils.HandleValidationError(c, err)
 	}
@@ -45,14 +31,19 @@ func Register(c *fiber.Ctx) error {
 		return utils.HandleValidationError(c, err)
 	}
 
+	// TODO :: set default role to 'guest' if not provided
 	if req.Role == "" {
 		req.Role = "guest"
 	}
 
+	if req.Role != "guest" && req.Role != "admin" {
+		return c.Status(fiber.StatusBadRequest).JSON(res.ErrorResponse("Invalid role provided", nil))
+	}
+
 	var count int64
-	database.DB.Model(&model.User{}).Where("email = ?", req.Email).Count(&count)
+	database.DB.Model(&model.User{}).Where("username = ?", req.Username).Count(&count)
 	if count > 0 {
-		return c.Status(fiber.StatusBadRequest).JSON(res.ErrorResponse("Email already used", nil))
+		return c.Status(fiber.StatusBadRequest).JSON(res.ErrorResponse("Username already used", nil))
 	}
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
@@ -60,7 +51,13 @@ func Register(c *fiber.Ctx) error {
 		return utils.HandleServerError(c, err)
 	}
 
-	user := model.User{Name: req.Name, Email: req.Email, Password: string(hash), Role: req.Role}
+	user := model.User{
+		Username: req.Username,
+		FullName: req.FullName,
+		Password: string(hash),
+		Role:     req.Role,
+	}
+
 	if err := database.DB.Create(&user).Error; err != nil {
 		return utils.HandleServerError(c, err)
 	}
@@ -72,10 +69,13 @@ func Register(c *fiber.Ctx) error {
 
 	return c.Status(fiber.StatusCreated).JSON(res.SuccessResponse("User registered successfully", fiber.Map{
 		"user": fiber.Map{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  user.Role,
+			"id":              user.ID,
+			"username":        user.Username,
+			"full_name":       user.FullName,
+			"role":            user.Role,
+			"register_date":   user.RegisterDate,
+			"esign_id":        user.EsignID,
+			"esign_status_id": user.EsignStatusID,
 		},
 		"tokens": fiber.Map{
 			"accessToken":  tokens.AccessToken,
@@ -86,18 +86,18 @@ func Register(c *fiber.Ctx) error {
 
 // ===================== LOGIN =====================
 // @Summary Login user
-// @Description Login with email and password, returns access & refresh tokens
+// @Description Login with username and password, returns access & refresh tokens
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param payload body LoginRequest true "Login payload"
+// @Param payload body validation.LoginRequest true "Login payload"
 // @Success 200 {object} res.Response{data=map[string]interface{}}
 // @Failure 400 {object} res.Response
 // @Failure 401 {object} res.Response
 // @Failure 500 {object} res.Response
 // @Router /auth/login [post]
 func Login(c *fiber.Ctx) error {
-	var req LoginRequest
+	var req validation.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
 		return utils.HandleValidationError(c, err)
 	}
@@ -106,7 +106,7 @@ func Login(c *fiber.Ctx) error {
 	}
 
 	var user model.User
-	if err := database.DB.Where("email = ?", req.Email).First(&user).Error; err != nil {
+	if err := database.DB.Where("username = ?", req.Username).First(&user).Error; err != nil {
 		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid credentials", nil))
 	}
 
@@ -121,10 +121,13 @@ func Login(c *fiber.Ctx) error {
 
 	return c.JSON(res.SuccessResponse("Login successful", fiber.Map{
 		"user": fiber.Map{
-			"id":    user.ID,
-			"name":  user.Name,
-			"email": user.Email,
-			"role":  user.Role,
+			"id":              user.ID,
+			"username":        user.Username,
+			"full_name":       user.FullName,
+			"role":            user.Role,
+			"register_date":   user.RegisterDate,
+			"esign_id":        user.EsignID,
+			"esign_status_id": user.EsignStatusID,
 		},
 		"tokens": fiber.Map{
 			"accessToken":  tokens.AccessToken,
@@ -139,16 +142,14 @@ func Login(c *fiber.Ctx) error {
 // @Tags Auth
 // @Accept json
 // @Produce json
-// @Param payload body map[string]string true "Refresh token payload"
+// @Param payload body validation.RefreshRequest true "Refresh token payload"
 // @Success 200 {object} res.Response{data=map[string]string}
 // @Failure 400 {object} res.Response
 // @Failure 401 {object} res.Response
 // @Failure 500 {object} res.Response
 // @Router /auth/refresh [post]
 func Refresh(c *fiber.Ctx) error {
-	var body struct {
-		RefreshToken string `json:"refreshToken" validate:"required"`
-	}
+	var body validation.RefreshRequest
 	if err := c.BodyParser(&body); err != nil {
 		return utils.HandleValidationError(c, err)
 	}
@@ -165,17 +166,12 @@ func Refresh(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid token type", nil))
 	}
 
-	subStr, ok := claims["sub"].(string)
+	sub, ok := claims["sub"].(string)
 	if !ok {
 		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid subject", nil))
 	}
 
-	sub, err := strconv.ParseUint(subStr, 10, 64)
-	if err != nil {
-		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid subject format", nil))
-	}
-
-	tokens, err := utils.GenerateTokenPair(uint(sub))
+	tokens, err := utils.GenerateTokenPair(sub)
 	if err != nil {
 		return utils.HandleServerError(c, err)
 	}
@@ -195,21 +191,5 @@ func Refresh(c *fiber.Ctx) error {
 // @Success 200 {object} res.Response
 // @Router /auth/logout [post]
 func Logout(c *fiber.Ctx) error {
-	return c.JSON(res.SuccessResponse("Logout successful", nil))
-}
-
-// ===================== CHECK TOKEN =====================
-// @Summary Check token validity
-// @Description Verify if the token is valid and the user is active
-// @Tags Auth
-// @Produce json
-// @Security Bearer
-// @Success 200 {object} res.Response{data=map[string]interface{}}
-// @Failure 401 {object} res.Response
-// @Router /auth/check [get]
-func CheckToken(c *fiber.Ctx) error {
-	userID := c.Locals("userID").(uint)
-	return c.JSON(res.SuccessResponse("Token is valid", fiber.Map{
-		"userID": userID,
-	}))
+	return c.JSON(res.SuccessResponse("Logout successful", fiber.Map{}))
 }

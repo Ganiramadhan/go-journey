@@ -21,24 +21,29 @@ func ttlFromEnv(key string, def time.Duration) time.Duration {
 	return def
 }
 
-func GenerateTokenPair(userID uint) (TokenPair, error) {
+func GenerateTokenPair(userID string) (TokenPair, error) {
 	secret := os.Getenv("JWT_SECRET")
 	accessTTL := ttlFromEnv("ACCESS_TOKEN_TTL", 15*time.Minute)
 	refreshTTL := ttlFromEnv("REFRESH_TOKEN_TTL", 7*24*time.Hour)
 
+	now := time.Now()
+
 	access := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":  userID,
 		"type": "access",
-		"exp":  time.Now().Add(accessTTL).Unix(),
-		"iat":  time.Now().Unix(),
+		"exp":  now.Add(accessTTL).Unix(),
+		"iat":  now.Unix(),
 	})
+
+	// Refresh token
 	refresh := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"sub":  userID,
 		"type": "refresh",
-		"exp":  time.Now().Add(refreshTTL).Unix(),
-		"iat":  time.Now().Unix(),
+		"exp":  now.Add(refreshTTL).Unix(),
+		"iat":  now.Unix(),
 	})
 
+	// Sign token
 	accessStr, err := access.SignedString([]byte(secret))
 	if err != nil {
 		return TokenPair{}, err
@@ -59,6 +64,11 @@ func ParseToken(tokenStr string) (*jwt.Token, jwt.MapClaims, error) {
 	if err != nil {
 		return nil, nil, err
 	}
-	claims, _ := t.Claims.(jwt.MapClaims)
+
+	claims, ok := t.Claims.(jwt.MapClaims)
+	if !ok {
+		return t, nil, err
+	}
+
 	return t, claims, nil
 }
