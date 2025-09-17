@@ -23,6 +23,6 @@ COPY .env.production .env.production
 
 ENV APP_ENV=production
 
-EXPOSE 9001
+EXPOSE 8002
 
 CMD ["./main"]

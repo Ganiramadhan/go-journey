@@ -6,6 +6,7 @@ import (
 	"go-journey/src/res"
 	"go-journey/src/utils"
 	"go-journey/src/validation"
+	"strings"
 
 	"github.com/gofiber/fiber/v2"
 	"golang.org/x/crypto/bcrypt"
@@ -13,7 +14,7 @@ import (
 
 // ===================== REGISTER =====================
 // @Summary Register a new user
-// @Description Register a new user with role 'guest' or 'admin'
+// @Description Register a new user with role 'user' or 'admin'
 // @Tags Auth
 // @Accept json
 // @Produce json
@@ -25,18 +26,21 @@ import (
 func Register(c *fiber.Ctx) error {
 	var req validation.RegisterRequest
 	if err := c.BodyParser(&req); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 	if err := validation.ValidateStruct(req); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 
-	// TODO :: set default role to 'guest' if not provided
+	// sanitize input
+	req.Username = strings.TrimSpace(req.Username)
+	req.FullName = strings.TrimSpace(req.FullName)
+
+	// default role
 	if req.Role == "" {
-		req.Role = "guest"
+		req.Role = "user"
 	}
-
-	if req.Role != "guest" && req.Role != "admin" {
+	if req.Role != "user" && req.Role != "admin" {
 		return c.Status(fiber.StatusBadRequest).JSON(res.ErrorResponse("Invalid role provided", nil))
 	}
 
@@ -48,7 +52,7 @@ func Register(c *fiber.Ctx) error {
 
 	hash, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	user := model.User{
@@ -59,13 +63,15 @@ func Register(c *fiber.Ctx) error {
 	}
 
 	if err := database.DB.Create(&user).Error; err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	tokens, err := utils.GenerateTokenPair(user.ID)
 	if err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
+
+	utils.SaveRefreshToken(user.ID, tokens.RefreshToken)
 
 	return c.Status(fiber.StatusCreated).JSON(res.SuccessResponse("User registered successfully", fiber.Map{
 		"user": fiber.Map{
@@ -99,10 +105,10 @@ func Register(c *fiber.Ctx) error {
 func Login(c *fiber.Ctx) error {
 	var req validation.LoginRequest
 	if err := c.BodyParser(&req); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 	if err := validation.ValidateStruct(req); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 
 	var user model.User
@@ -116,8 +122,10 @@ func Login(c *fiber.Ctx) error {
 
 	tokens, err := utils.GenerateTokenPair(user.ID)
 	if err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
+
+	utils.SaveRefreshToken(user.ID, tokens.RefreshToken)
 
 	return c.JSON(res.SuccessResponse("Login successful", fiber.Map{
 		"user": fiber.Map{
@@ -151,10 +159,10 @@ func Login(c *fiber.Ctx) error {
 func Refresh(c *fiber.Ctx) error {
 	var body validation.RefreshRequest
 	if err := c.BodyParser(&body); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 	if err := validation.ValidateStruct(body); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 
 	t, claims, err := utils.ParseToken(body.RefreshToken)
@@ -171,10 +179,16 @@ func Refresh(c *fiber.Ctx) error {
 		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Invalid subject", nil))
 	}
 
+	if !utils.IsRefreshTokenValid(sub, body.RefreshToken) {
+		return c.Status(fiber.StatusUnauthorized).JSON(res.ErrorResponse("Refresh token revoked", nil))
+	}
+
 	tokens, err := utils.GenerateTokenPair(sub)
 	if err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
+
+	utils.SaveRefreshToken(sub, tokens.RefreshToken)
 
 	return c.JSON(res.SuccessResponse("Token refreshed successfully", fiber.Map{
 		"accessToken":  tokens.AccessToken,
@@ -184,12 +198,14 @@ func Refresh(c *fiber.Ctx) error {
 
 // ===================== LOGOUT =====================
 // @Summary Logout user
-// @Description Logout user (stateless, no server-side session)
+// @Description Logout user (invalidate refresh token)
 // @Tags Auth
 // @Produce json
 // @Security Bearer
 // @Success 200 {object} res.Response
 // @Router /auth/logout [post]
 func Logout(c *fiber.Ctx) error {
+	userID := c.Locals("userID").(string)
+	utils.RevokeRefreshToken(userID)
 	return c.JSON(res.SuccessResponse("Logout successful", fiber.Map{}))
 }

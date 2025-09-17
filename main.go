@@ -90,7 +90,7 @@ func main() {
 	// Port
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "9001"
+		port = "8002"
 	}
 	addr := fmt.Sprintf(":%s", port)
 

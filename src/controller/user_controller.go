@@ -21,7 +21,7 @@ import (
 func GetUsers(c *fiber.Ctx) error {
 	users, err := service.GetAllUsers()
 	if err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	for i := range users {
@@ -44,7 +44,7 @@ func GetUsers(c *fiber.Ctx) error {
 func GetUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
-		return utils.HandleValidationError(c, fiber.NewError(fiber.StatusBadRequest, "ID is required"))
+		return utils.ValidationError(c, fiber.NewError(fiber.StatusBadRequest, "ID is required"))
 	}
 
 	user, err := service.GetUserByID(id)
@@ -53,7 +53,7 @@ func GetUser(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusNotFound).
 				JSON(res.ErrorResponse("User not found", nil))
 		}
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	user.Password = "" // hide password
@@ -74,16 +74,16 @@ func GetUser(c *fiber.Ctx) error {
 func CreateUser(c *fiber.Ctx) error {
 	var req validation.CreateUserRequest
 	if err := c.BodyParser(&req); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 
 	if err := validation.ValidateStruct(&req); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 
 	hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 	if err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	user := model.User{
@@ -94,7 +94,7 @@ func CreateUser(c *fiber.Ctx) error {
 	}
 
 	if err := service.CreateUser(&user); err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	user.Password = "" // hide password
@@ -117,16 +117,16 @@ func CreateUser(c *fiber.Ctx) error {
 func UpdateUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
-		return utils.HandleValidationError(c, fiber.NewError(fiber.StatusBadRequest, "ID is required"))
+		return utils.ValidationError(c, fiber.NewError(fiber.StatusBadRequest, "ID is required"))
 	}
 
 	var req validation.UpdateUserRequest
 	if err := c.BodyParser(&req); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 
 	if err := validation.ValidateStruct(&req); err != nil {
-		return utils.HandleValidationError(c, err)
+		return utils.ValidationError(c, err)
 	}
 
 	user, err := service.GetUserByID(id)
@@ -135,7 +135,7 @@ func UpdateUser(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusNotFound).
 				JSON(res.ErrorResponse("User not found", nil))
 		}
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	// Apply updates
@@ -148,7 +148,7 @@ func UpdateUser(c *fiber.Ctx) error {
 	if req.Password != "" {
 		hashed, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
 		if err != nil {
-			return utils.HandleServerError(c, err)
+			return utils.InternalError(c, err)
 		}
 		user.Password = string(hashed)
 	}
@@ -157,7 +157,7 @@ func UpdateUser(c *fiber.Ctx) error {
 	}
 
 	if err := service.UpdateUser(&user); err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	user.Password = ""
@@ -178,7 +178,7 @@ func UpdateUser(c *fiber.Ctx) error {
 func DeleteUser(c *fiber.Ctx) error {
 	id := c.Params("id")
 	if id == "" {
-		return utils.HandleValidationError(c, fiber.NewError(fiber.StatusBadRequest, "ID is required"))
+		return utils.ValidationError(c, fiber.NewError(fiber.StatusBadRequest, "ID is required"))
 	}
 
 	_, err := service.GetUserByID(id)
@@ -187,11 +187,11 @@ func DeleteUser(c *fiber.Ctx) error {
 			return c.Status(fiber.StatusNotFound).
 				JSON(res.ErrorResponse("User not found", nil))
 		}
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	if err := service.DeleteUser(id); err != nil {
-		return utils.HandleServerError(c, err)
+		return utils.InternalError(c, err)
 	}
 
 	return c.JSON(res.SuccessResponse("User deleted successfully", nil))

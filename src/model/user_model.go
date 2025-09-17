@@ -16,6 +16,7 @@ type User struct {
 	RegisterDate  time.Time      `gorm:"autoCreateTime" json:"register_date"`
 	EsignID       string         `gorm:"type:varchar(100)" json:"esign_id"`
 	EsignStatusID string         `gorm:"type:varchar(50)" json:"esign_status_id"`
+	RefreshToken  string         `gorm:"type:varchar(255)" json:"-"`
 	CreatedAt     time.Time      `gorm:"autoCreateTime" json:"created_at"`
 	UpdatedAt     time.Time      `gorm:"autoUpdateTime" json:"updated_at"`
 	DeletedAt     gorm.DeletedAt `gorm:"index" json:"-"`

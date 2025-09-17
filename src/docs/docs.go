@@ -87,7 +87,7 @@ const docTemplate = `{
                         "Bearer": []
                     }
                 ],
-                "description": "Logout user (stateless, no server-side session)",
+                "description": "Logout user (invalidate refresh token)",
                 "produces": [
                     "application/json"
                 ],
@@ -174,7 +174,7 @@ const docTemplate = `{
         },
         "/auth/register": {
             "post": {
-                "description": "Register a new user with role 'guest' or 'admin'",
+                "description": "Register a new user with role 'user' or 'admin'",
                 "consumes": [
                     "application/json"
                 ],
